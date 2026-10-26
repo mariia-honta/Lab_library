@@ -2,7 +2,7 @@
 
 public class Book
 {
-    public Guid Id { get; }
+    public BookId Id { get; } 
     public string Title { get; private set; }
     public string Author { get; private set; }
     public int PublishedYear { get; private set; }
@@ -11,10 +11,10 @@ public class Book
     public bool IsAvailable { get; private set; }
     public DateTime CreatedAt { get; }
 
-    private Book(Guid id, string title, string author, int publishedYear, Genre genre, string isbn,bool isAvailable, DateTime createdAt) 
+    private Book(BookId id, string title, string author, int publishedYear, Genre genre, string isbn,bool isAvailable, DateTime createdAt) 
         => (Id, Title, Author, PublishedYear, Genre, Isbn, IsAvailable, CreatedAt) = (id, title, author, publishedYear, genre, isbn,isAvailable, createdAt);
     
-    public static Book New(Guid id, string title, string author, int publishedYear, Genre genre, string isbn,bool isAvailable=true)
+    public static Book New(BookId id, string title, string author, int publishedYear, Genre genre, string isbn,bool isAvailable=true)
         => new(id, title, author, publishedYear, genre, isbn,isAvailable ,DateTime.UtcNow);
     
     public void UpdateDetails(string title, string author, int publishedYear, Genre genre, string isbn,bool isAvailable)

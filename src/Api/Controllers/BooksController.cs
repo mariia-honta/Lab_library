@@ -1,13 +1,16 @@
 ﻿using Api.Dtos;
-using Application.Books.Services.Abstract;
+using Api.Modules.Errors;
+using Application.Books.Commands;
+using Application.Common.Interfaces.Queries;
 using Domain.Books;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Controllers;
 
 [Route("books")]
 [ApiController]
-public class BooksController(IBookService bookService) : ControllerBase
+public class BooksController(ISender sender, IBookQueries bookQueries) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<BookDto>>> GetBooks(
@@ -16,20 +19,19 @@ public class BooksController(IBookService bookService) : ControllerBase
         [FromQuery] bool? isAvailable,
         CancellationToken cancellationToken)
     {
-        var books = await bookService.GetBooks(author, genre, isAvailable, cancellationToken);
+        var books = await bookQueries.GetAll(author, genre, isAvailable, cancellationToken);
+
         return books.Select(BookDto.FromDomainModel).ToList();
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<BookDto>> GetBook(Guid id, CancellationToken cancellationToken)
     {
-        var book = await bookService.GetBook(id, cancellationToken);
-        if (book is null)
-        {
-            return NotFound();
-        }
+        var book = await bookQueries.GetById(new BookId(id), cancellationToken);
 
-        return BookDto.FromDomainModel(book);
+        return book.Match<ActionResult<BookDto>>(
+            b => BookDto.FromDomainModel(b),
+            () => NotFound());
     }
 
     [HttpPost]
@@ -37,18 +39,21 @@ public class BooksController(IBookService bookService) : ControllerBase
         [FromBody] CreateBookDto request,
         CancellationToken cancellationToken)
     {
-        try
+        var command = new CreateBookCommand
         {
-            var book = await bookService.Add(request.Title, request.Author, request.PublishedYear, request.Genre, 
-                request.Isbn, request.IsAvailable,cancellationToken);
-            var dto = BookDto.FromDomainModel(book);
+            Title = request.Title,
+            Author = request.Author,
+            PublishedYear = request.PublishedYear,
+            Genre = request.Genre,
+            Isbn = request.Isbn,
+            IsAvailable = request.IsAvailable
+        };
 
-            return CreatedAtAction(nameof(GetBook), new { id = dto.Id }, dto);
-        }
-        catch (ArgumentException exception)
-        {
-            return Conflict(exception.Message);
-        }
+        var result = await sender.Send(command, cancellationToken);
+
+        return result.Match<ActionResult<BookDto>>(
+            b => CreatedAtAction(nameof(GetBook), new { id = b.Id.Value }, BookDto.FromDomainModel(b)),
+            e => e.ToObjectResult());
     }
 
     [HttpPut("{id:guid}")]
@@ -57,33 +62,31 @@ public class BooksController(IBookService bookService) : ControllerBase
         [FromBody] UpdateBookDto request,
         CancellationToken cancellationToken)
     {
-        try
+        var command = new UpdateBookCommand
         {
-            var book = await bookService.Update(id, request.Title, request.Author, request.PublishedYear, request.Genre,
-                request.Isbn, request.IsAvailable,cancellationToken);
-            if (book is null)
-            {
-                return NotFound();
-            }
+            BookId = id,
+            Title = request.Title,
+            Author = request.Author,
+            PublishedYear = request.PublishedYear,
+            Genre = request.Genre,
+            Isbn = request.Isbn,
+            IsAvailable = request.IsAvailable
+        };
 
-            return BookDto.FromDomainModel(book);
-        }
-        catch (ArgumentException exception)
-        {
-            return Conflict(exception.Message);
-        }
+        var result = await sender.Send(command, cancellationToken);
+
+        return result.Match<ActionResult<BookDto>>(
+            b => BookDto.FromDomainModel(b),
+            e => e.ToObjectResult());
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteBook(Guid id, CancellationToken cancellationToken)
     {
-        var deleted = await bookService.Delete(id, cancellationToken);
-        if (!deleted)
-        {
-            return NotFound();
-        }
+        var result = await sender.Send(new DeleteBookCommand { BookId = id }, cancellationToken);
 
-        return NoContent();
+        return result.Match<IActionResult>(
+            _ => NoContent(),
+            e => e.ToObjectResult());
     }
-    
 }

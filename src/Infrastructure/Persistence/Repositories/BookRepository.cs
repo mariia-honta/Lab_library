@@ -1,14 +1,16 @@
-﻿using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces.Queries;
+using Application.Common.Interfaces.Repositories;
 using Domain.Books;
 using Microsoft.EntityFrameworkCore;
+using LanguageExt;
 
 namespace Infrastructure.Persistence.Repositories;
 
-public class BookRepository(ApplicationDbContext context) : IBookRepository
+public class BookRepository(ApplicationDbContext context) : IBookRepository, IBookQueries
 {
     public async Task<IReadOnlyList<Book>> GetAll(string? author, Genre? genre, bool? isAvailable, CancellationToken cancellationToken)
     {
-        var query = context.Books.AsQueryable();
+        var query = context.Books.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(author))
             query = query.Where(x => x.Author.Contains(author));
@@ -21,12 +23,19 @@ public class BookRepository(ApplicationDbContext context) : IBookRepository
 
         return await query.ToListAsync(cancellationToken);
     }
-    public async Task<Book?> GetById(Guid id, CancellationToken cancellationToken)
-        => await context.Books.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+    public async Task<Option<Book>> GetById(BookId id, CancellationToken cancellationToken)
+    {
+        var entity = await context.Books
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        return entity ?? Option<Book>.None;
+    }
+    public async Task<Option<Book>> GetByIsbn(string isbn, CancellationToken cancellationToken)
+    {
+        var entity = await context.Books
+            .FirstOrDefaultAsync(x => x.Isbn == isbn, cancellationToken);
 
-    public async Task<Book?> GetByIsbn(string isbn, CancellationToken cancellationToken)
-        => await context.Books.FirstOrDefaultAsync(x => x.Isbn == isbn, cancellationToken);
-
+        return entity ?? Option<Book>.None;
+    }
     public async Task<Book> Add(Book book, CancellationToken cancellationToken)
     {
         await context.Books.AddAsync(book, cancellationToken);

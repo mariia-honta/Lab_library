@@ -1,4 +1,5 @@
-﻿using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces.Queries;
+using Application.Common.Interfaces.Repositories;
 using Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -36,5 +37,5 @@ public static class ConfigurePersistenceServices
     {
         services.AddScoped<BookRepository>();
         services.AddScoped<IBookRepository>(provider => provider.GetRequiredService<BookRepository>());
-    }
+        services.AddScoped<IBookQueries>(provider => provider.GetRequiredService<BookRepository>());    }
 }

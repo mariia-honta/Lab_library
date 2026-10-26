@@ -10,6 +10,7 @@ public class BooksConfiguration : IEntityTypeConfiguration<Book>
     public void Configure(EntityTypeBuilder<Book> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).HasConversion(x => x.Value, x => new BookId(x));
 
         builder.Property(x => x.Title)
             .HasColumnType("varchar(255)")
